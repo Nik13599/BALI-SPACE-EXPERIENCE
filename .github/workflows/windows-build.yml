@@ -1,0 +1,64 @@
+name: Build Windows App
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller==6.15.0
+
+      - name: Build portable EXE
+        shell: pwsh
+        run: pyinstaller --noconfirm --clean BaliSpaceExperience.spec
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss'
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BALI-SPACE-Windows
+          if-no-files-found: error
+          path: |
+            dist/BALI_SPACE_EXPERIENCE.exe
+            installer_output/BALI_SPACE_EXPERIENCE_Setup.exe
+
+      - name: Publish rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete windows-latest --cleanup-tag -y 2>$null
+          gh release create windows-latest `
+            "dist/BALI_SPACE_EXPERIENCE.exe#BALI_SPACE_EXPERIENCE.exe" `
+            "installer_output/BALI_SPACE_EXPERIENCE_Setup.exe#BALI_SPACE_EXPERIENCE_Setup.exe" `
+            --target "${{ github.sha }}" `
+            --title "BALI SPACE EXPERIENCE — Windows Latest" `
+            --notes "Automatic Windows build. Download Setup.exe to install, or the portable EXE to run without installation." `
+            --latest
