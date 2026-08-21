@@ -1,0 +1,5 @@
+pygame-ce==2.5.5
+numpy==2.2.6
+soundcard==0.4.5
+cffi==1.17.1
+Pillow==11.3.0
